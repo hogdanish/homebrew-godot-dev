@@ -17,6 +17,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0 # ensure full history for versioning
 
       - name: Setup Homebrew
@@ -26,8 +27,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          brew update
-          brew tap fractalcounty/homebrew-godot-dev
           ruby update_casks.rb
 
       - name: Create pull request
