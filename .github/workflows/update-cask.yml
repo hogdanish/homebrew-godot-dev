@@ -14,13 +14,6 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Create GitHub App Token
-        uses: actions/create-github-app-token@v1
-        id: generate-token
-        with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
@@ -41,7 +34,7 @@ jobs:
         id: create-pr
         uses: peter-evans/create-pull-request@v7
         with:
-          token: ${{ steps.generate-token.outputs.token }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: 'Updated to latest godot-build releases'
           title: 'Update latest Godot build releases'
           body: |
@@ -49,14 +42,12 @@ jobs:
 
             **Note:** Only one `godot-dev` cask can be installed at a time to prevent conflicts with the CLI tool.
           delete-branch: true
-          sign-commits: true # disable if auth issues show up
+          sign-commits: false
 
       - name: Auto-merge PR
         env:
-          GITHUB_APP_TOKEN: ${{ steps.generate-token.outputs.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "${GITHUB_APP_TOKEN}" | gh auth login --with-token
-
           PR_NUMBER=${{ steps.create-pr.outputs.pull-request-number }}
 
           if [ -n "$PR_NUMBER" ]; then
