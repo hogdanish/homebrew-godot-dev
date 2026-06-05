@@ -22,7 +22,7 @@ This is a Homebrew tap for installing development and release candidate builds o
 The script follows this workflow:
 
 1. **Fetch releases** (`fetch_releases`): Queries GitHub API for godot-builds releases with retry logic
-2. **Extract versions** (`extract_versions`): Filters for prereleases matching pattern `^\d+\.\d+-(dev|rc)\d*$`, sorts by publish date, takes 5 most recent
+2. **Extract versions** (`extract_versions`): Filters for prereleases matching pattern `\A\d+\.\d+(?:\.\d+)?-[a-z]+\d*\z` (any stage — `dev`/`beta`/`rc` — including patch-version prereleases like `4.6.3-rc2`), sorts by publish date, takes 5 most recent
 3. **Check for updates** (`read_latest_release`): Compares against `latest_release.txt` to avoid redundant updates
 4. **Download and hash** (`compute_sha256`): Downloads each release asset to compute SHA256 checksum
 5. **Generate casks** (`generate_cask_content`): Creates cask Ruby DSL with version-specific metadata
@@ -90,12 +90,15 @@ gh workflow run update-cask.yml
 
 ### Version Pattern Matching
 
-Only releases matching this regex are processed: `^\d+\.\d+-(dev|rc)\d*$`
+Only prereleases (`prerelease: true`) whose tag matches `\A\d+\.\d+(?:\.\d+)?-[a-z]+\d*\z` are processed. The stage suffix is intentionally **not** hardcoded to `dev|beta|rc` — any lowercase stage is accepted so a new Godot prerelease stage is picked up automatically. Stable builds are excluded via the `prerelease` flag, not the regex.
 
 Examples that match:
 - `4.5-dev5`
+- `4.7-beta5`
 - `4.4-rc1`
-- `4.3-rc3`
+- `4.6.3-rc2` (patch-version prerelease)
+
+If `extract_versions` ever matches zero releases while the API returned data, the script `abort`s with a non-zero exit so the scheduled workflow fails loudly (emailing the repo owner) instead of silently going stale.
 
 ### Cask Conflicts
 

@@ -40,10 +40,17 @@ def fetch_releases
   end
 end
 
+# Matches any Godot prerelease tag: "X.Y-<stage>N" or "X.Y.Z-<stage>N"
+# (e.g. 4.7-dev5, 4.7-beta5, 4.6.3-rc2). We deliberately do NOT hardcode the
+# stage names (dev/beta/rc); any lowercase suffix is accepted so that a new
+# stage Godot might introduce is picked up automatically. Stable releases
+# ("X.Y-stable") are excluded by the prerelease flag, not this pattern.
+PRERELEASE_TAG = /\A\d+\.\d+(?:\.\d+)?-[a-z]+\d*\z/
+
 # Extract version tags that are prereleases and match the pattern
 def extract_versions(releases)
-  releases.select { |r| 
-    r['prerelease'] && r['tag_name'] =~ /^\d+\.\d+-(dev|rc)\d*$/
+  releases.select { |r|
+    r['prerelease'] && r['tag_name'] =~ PRERELEASE_TAG
   }
   .sort_by { |r| r['published_at'] }
   .reverse
@@ -98,7 +105,7 @@ def generate_cask_content(version, sha256_checksum, latest = false)
       livecheck do
         #{latest ? 'url "https://github.com/godotengine/godot-builds/releases"' : 'skip "This is a versioned cask"'}
         #{latest ? 'strategy :github_latest' : ''}
-        #{latest ? 'regex(/^(\d+\.\d+-(dev|rc)\d+)$/)' : ''}
+        #{latest ? 'regex(/^(\d+\.\d+(?:\.\d+)?-(?:dev|beta|rc)\d+)$/)' : ''}
       end
 
       auto_updates true
@@ -168,11 +175,18 @@ end
 
 def main
   releases = fetch_releases
+
+  # Hard-fail (non-zero exit) on these so the scheduled workflow surfaces a
+  # failure email instead of silently going stale, which is exactly how the
+  # missing-beta-builds gap went unnoticed.
+  if releases.empty?
+    abort "ERROR: could not fetch any releases from godot-builds (API failure). Failing loudly so this is visible."
+  end
+
   versions = extract_versions(releases)
-  
+
   if versions.empty?
-    puts "No versions found or unable to fetch versions. Exiting."
-    exit 0
+    abort "ERROR: fetched #{releases.size} releases but none matched the prerelease pattern #{PRERELEASE_TAG.inspect}. Godot's tag format may have changed — update extract_versions."
   end
 
   latest_release = read_latest_release
