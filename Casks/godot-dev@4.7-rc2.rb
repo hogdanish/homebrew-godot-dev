@@ -1,21 +1,21 @@
-cask "godot-dev" do
+cask "godot-dev@4.7-rc2" do
   version "4.7-rc2"
   sha256 "bb312b9f8b10a8c3b3c0516e61932f6b73afcc08cb07af58deb098454dedaded"
 
   url "https://github.com/godotengine/godot-builds/releases/download/4.7-rc2/Godot_v4.7-rc2_macos.universal.zip",
       verified: "github.com/godotengine/godot-builds/"
-  name "Godot Engine (Latest)"
-  desc "Free and open source 2D and 3D game engine (Latest godot-builds release)"
+  name "Godot Engine (Build 4.7-rc2)"
+  desc "Free and open source 2D and 3D game engine (godot-builds release4.7-rc2)"
   homepage "https://godotengine.org/"
 
   livecheck do
-    url "https://github.com/godotengine/godot-builds/releases"
-    strategy :github_latest
-    regex(/^(\d+\.\d+(?:\.\d+)?-(?:dev|beta|rc)\d+)$/)
+    skip "This is a versioned cask"
+    
+    
   end
 
   auto_updates true
-  conflicts_with cask: "godot-dev@*"
+  conflicts_with cask: "godot-dev"
 
   app "Godot.app", target: "Godot Dev.app"
 
