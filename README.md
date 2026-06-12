@@ -16,8 +16,7 @@ This is a Homebrew tap I made so that I could install development builds of the 
 ## Installation
 
 > [!WARNING]
-> This is an unofficial project created for my own convenience and may not be maintained or updated regularly.
-> Use at your own risk!
+> This is an unofficial project created for my own convenience. It is not affiliated with or endorsed by the Godot Engine project. It may not be maintained or updated regularly. Use at your own risk!
 
 1. Add this tap to your Homebrew installation:
 
