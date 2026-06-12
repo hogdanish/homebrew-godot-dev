@@ -5,9 +5,16 @@ on:
     - cron: '0 */6 * * *' # runs every 6 hours
   workflow_dispatch:
 
+# Prevent a manual dispatch from overlapping a scheduled run.
+concurrency:
+  group: update-casks
+  cancel-in-progress: false
+
 jobs:
   update-casks:
-    runs-on: macos-latest
+    # Pure-Ruby job (GitHub API + asset download + file writes); nothing here
+    # needs macOS, so we use the faster, cheaper, lower-churn Ubuntu runner.
+    runs-on: ubuntu-latest
 
     permissions:
       contents: write
@@ -18,7 +25,11 @@ jobs:
         uses: actions/checkout@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0 # ensure full history for versioning
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
 
       - name: Run update_casks.rb
         env:

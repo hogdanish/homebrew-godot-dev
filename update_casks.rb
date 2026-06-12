@@ -93,7 +93,7 @@ def compute_sha256(asset_url)
   begin
     uri = URI(asset_url)
     puts "Downloading asset to compute sha256: #{asset_url}"
-    asset_data = URI.open(uri, ssl_verify_mode: OpenSSL::SSL::VERIFY_NONE).read
+    asset_data = URI.open(uri).read
     sha256 = Digest::SHA256.hexdigest(asset_data)
     puts "Computed sha256: #{sha256}"
     sha256
@@ -121,6 +121,20 @@ def generate_cask_content(version, sha256_checksum, latest = false)
   cask_name = latest ? "godot-dev" : "godot-dev@#{version}"
   app_target = "Godot Dev.app"
 
+  # The livecheck regex deliberately mirrors PRERELEASE_TAG's philosophy: the
+  # stage label is matched as [a-z]+ rather than a hardcoded (dev|beta|rc) list,
+  # so a new Godot stage (e.g. alpha) is picked up automatically without edits.
+  livecheck_body =
+    if latest
+      [
+        '    url "https://github.com/godotengine/godot-builds/releases"',
+        '    strategy :github_latest',
+        '    regex(/^(\d+\.\d+(?:\.\d+)?-[a-z]+\d*)$/)',
+      ].join("\n")
+    else
+      '    skip "This is a versioned cask"'
+    end
+
   <<~RUBY
     cask "#{cask_name}" do
       version "#{version}"
@@ -129,20 +143,18 @@ def generate_cask_content(version, sha256_checksum, latest = false)
       url "https://github.com/godotengine/godot-builds/releases/download/#{version}/Godot_v#{version}_macos.universal.zip",
           verified: "github.com/godotengine/godot-builds/"
       name "Godot Engine #{latest ? '(Latest)' : "(Build #{version})"}"
-      desc "Free and open source 2D and 3D game engine #{latest ? '(Latest godot-builds release)' : "(godot-builds release#{version})"}"
+      desc "Free and open source 2D and 3D game engine #{latest ? '(Latest godot-builds release)' : "(godot-builds release #{version})"}"
       homepage "https://godotengine.org/"
 
       livecheck do
-        #{latest ? 'url "https://github.com/godotengine/godot-builds/releases"' : 'skip "This is a versioned cask"'}
-        #{latest ? 'strategy :github_latest' : ''}
-        #{latest ? 'regex(/^(\d+\.\d+(?:\.\d+)?-(?:dev|beta|rc)\d+)$/)' : ''}
+    #{livecheck_body}
       end
 
       auto_updates true
       conflicts_with cask: #{latest ? '"godot-dev@*"' : '"godot-dev"'}
+      depends_on :macos
 
       app "Godot.app", target: "#{app_target}"
-
       binary "\#{appdir}/#{app_target}/Contents/MacOS/Godot", target: "godot-dev"
 
       zap trash: [
@@ -203,14 +215,19 @@ def update_casks(versions)
     end
   end
 
-  # Latest cask — reuse the SHA256 from the versioned cask if available
+  # Latest cask — reuse the SHA256 from the versioned cask if available.
+  # If we can't obtain a checksum for the *latest* release, hard-fail: a missing
+  # download almost always means Godot changed the macOS asset naming, and silently
+  # skipping would leave the main cask stale without surfacing the problem.
   latest_version = versions.first
   sha256_checksum = read_sha256_from_cask(latest_version) || fetch_sha256(latest_version)
-  if sha256_checksum
-    write_cask_file("godot-dev", generate_cask_content(latest_version, sha256_checksum, true))
-  else
-    puts "Skipping latest cask update due to missing sha256 checksum for #{latest_version}."
+  unless sha256_checksum
+    abort "ERROR: could not obtain sha256 for latest release #{latest_version}. " \
+          "The macOS asset URL may have changed (expected " \
+          "Godot_v#{latest_version}_macos.universal.zip) — update fetch_sha256."
   end
+
+  write_cask_file("godot-dev", generate_cask_content(latest_version, sha256_checksum, true))
 end
 
 def main
@@ -242,4 +259,4 @@ def main
   write_latest_release(versions.first)
 end
 
-main
+main if __FILE__ == $PROGRAM_NAME

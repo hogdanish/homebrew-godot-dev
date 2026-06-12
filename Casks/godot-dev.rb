@@ -11,14 +11,14 @@ cask "godot-dev" do
   livecheck do
     url "https://github.com/godotengine/godot-builds/releases"
     strategy :github_latest
-    regex(/^(\d+\.\d+(?:\.\d+)?-(?:dev|beta|rc)\d+)$/)
+    regex(/^(\d+\.\d+(?:\.\d+)?-[a-z]+\d*)$/)
   end
 
   auto_updates true
   conflicts_with cask: "godot-dev@*"
+  depends_on :macos
 
   app "Godot.app", target: "Godot Dev.app"
-
   binary "#{appdir}/Godot Dev.app/Contents/MacOS/Godot", target: "godot-dev"
 
   zap trash: [
