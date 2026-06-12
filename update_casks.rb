@@ -47,15 +47,33 @@ end
 # ("X.Y-stable") are excluded by the prerelease flag, not this pattern.
 PRERELEASE_TAG = /\A\d+\.\d+(?:\.\d+)?-[a-z]+\d*\z/
 
-# Extract version tags that are prereleases and match the pattern
+# Extract the X.Y major.minor version from a tag (e.g. "4.6" from "4.6.3-rc2")
+def major_minor(tag)
+  tag.match(/\A(\d+\.\d+)/)[1]
+end
+
+# Return all prerelease versions for the NUM_TRACKED most recent major.minor series.
+# E.g. with NUM_TRACKED=2 and releases spanning 4.5/4.6/4.7, this returns every
+# 4.6.x and 4.7.x prerelease, sorted newest-first.
+NUM_TRACKED = 2
+
 def extract_versions(releases)
-  releases.select { |r|
+  prerelease_releases = releases.select { |r|
     r['prerelease'] && r['tag_name'] =~ PRERELEASE_TAG
   }
-  .sort_by { |r| r['published_at'] }
-  .reverse
-  .take(5)
-  .map { |r| r['tag_name'] }
+
+  # Find the NUM_TRACKED most recent major.minor series (compare numerically)
+  recent_minors = prerelease_releases
+    .map { |r| major_minor(r['tag_name']) }
+    .uniq
+    .sort_by { |v| v.split('.').map(&:to_i) }
+    .last(NUM_TRACKED)
+
+  prerelease_releases
+    .select { |r| recent_minors.include?(major_minor(r['tag_name'])) }
+    .sort_by { |r| r['published_at'] }
+    .reverse
+    .map { |r| r['tag_name'] }
 end
 
 def read_latest_release
@@ -75,7 +93,6 @@ def compute_sha256(asset_url)
   begin
     uri = URI(asset_url)
     puts "Downloading asset to compute sha256: #{asset_url}"
-    # Open the URI and read in binary mode
     asset_data = URI.open(uri, ssl_verify_mode: OpenSSL::SSL::VERIFY_NONE).read
     sha256 = Digest::SHA256.hexdigest(asset_data)
     puts "Computed sha256: #{sha256}"
@@ -86,9 +103,22 @@ def compute_sha256(asset_url)
   end
 end
 
+# Read the sha256 from an already-generated versioned cask file to avoid re-downloading
+def read_sha256_from_cask(version)
+  cask_path = "Casks/godot-dev@#{version}.rb"
+  return nil unless File.exist?(cask_path)
+  match = File.read(cask_path).match(/sha256\s+"([0-9a-f]{64})"/)
+  match&.[](1)
+end
+
+def fetch_sha256(version)
+  asset_url = "https://github.com/godotengine/godot-builds/releases/download/#{version}/Godot_v#{version}_macos.universal.zip"
+  compute_sha256(asset_url)
+end
+
 # Generate the cask content with sha256 checksum
 def generate_cask_content(version, sha256_checksum, latest = false)
-  cask_name = latest ? "godot-dev" : "godot-dev@#{version}" 
+  cask_name = latest ? "godot-dev" : "godot-dev@#{version}"
   app_target = "Godot Dev.app"
 
   <<~RUBY
@@ -145,29 +175,39 @@ def write_cask_file(name, content)
   puts "Cask #{name} has been updated."
 end
 
+# Delete versioned cask files whose version is no longer in the tracked set
+def cleanup_old_casks(versions)
+  Dir.glob('Casks/godot-dev@*.rb').each do |cask_path|
+    version = File.basename(cask_path, '.rb').sub('godot-dev@', '')
+    unless versions.include?(version)
+      puts "Removing stale cask: #{cask_path}"
+      File.delete(cask_path)
+    end
+  end
+end
+
 # Update casks with the latest versions
 def update_casks(versions)
-  # versioned casks
   versions.each do |version|
-    asset_name = "Godot_v#{version}_macos.universal.zip"
-    asset_url = "https://github.com/godotengine/godot-builds/releases/download/#{version}/#{asset_name}"
-    sha256_checksum = compute_sha256(asset_url)
+    # Versioned cask content is immutable once created — skip if it already exists
+    if File.exist?("Casks/godot-dev@#{version}.rb")
+      puts "Versioned cask #{version} already exists. Skipping."
+      next
+    end
+
+    sha256_checksum = fetch_sha256(version)
     if sha256_checksum
-      cask_content = generate_cask_content(version, sha256_checksum)
-      write_cask_file("godot-dev@#{version}", cask_content)
+      write_cask_file("godot-dev@#{version}", generate_cask_content(version, sha256_checksum))
     else
       puts "Skipping cask for #{version} due to missing sha256 checksum."
     end
   end
 
-  # latest cask
+  # Latest cask — reuse the SHA256 from the versioned cask if available
   latest_version = versions.first
-  asset_name = "Godot_v#{latest_version}_macos.universal.zip"
-  asset_url = "https://github.com/godotengine/godot-builds/releases/download/#{latest_version}/#{asset_name}"
-  sha256_checksum = compute_sha256(asset_url)
+  sha256_checksum = read_sha256_from_cask(latest_version) || fetch_sha256(latest_version)
   if sha256_checksum
-    latest_cask_content = generate_cask_content(latest_version, sha256_checksum, true)
-    write_cask_file("godot-dev", latest_cask_content)
+    write_cask_file("godot-dev", generate_cask_content(latest_version, sha256_checksum, true))
   else
     puts "Skipping latest cask update due to missing sha256 checksum for #{latest_version}."
   end
@@ -189,12 +229,15 @@ def main
     abort "ERROR: fetched #{releases.size} releases but none matched the prerelease pattern #{PRERELEASE_TAG.inspect}. Godot's tag format may have changed — update extract_versions."
   end
 
+  # Always clean up stale versioned casks (handles the case where a series ages out)
+  cleanup_old_casks(versions)
+
   latest_release = read_latest_release
   if latest_release == versions.first
     puts "No new releases since last update (#{latest_release}). Exiting."
     exit 0
   end
-  
+
   update_casks(versions)
   write_latest_release(versions.first)
 end
