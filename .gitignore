@@ -4,4 +4,5 @@
 ._*
 *.secrets
 .docs/
-llm*CLAUDE.md
+llm*
+CLAUDE.md
