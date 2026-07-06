@@ -1,8 +1,8 @@
 cask "godot-dev" do
-  version "4.7.1-rc1"
-  sha256 "134ad58d3ebe4e504699fd65f00183bdc8fb952a7c53a2fe6fe0f3191fa3087f"
+  version "4.8-dev1"
+  sha256 "0337f04e3375bb39039b3f4712bb3f682c5d1cced083f6511e18a050b21142d0"
 
-  url "https://github.com/godotengine/godot-builds/releases/download/4.7.1-rc1/Godot_v4.7.1-rc1_macos.universal.zip",
+  url "https://github.com/godotengine/godot-builds/releases/download/4.8-dev1/Godot_v4.8-dev1_macos.universal.zip",
       verified: "github.com/godotengine/godot-builds/"
   name "Godot Engine (Latest)"
   desc "Free and open source 2D and 3D game engine (Latest godot-builds release)"

@@ -1,11 +1,11 @@
-cask "godot-dev@4.6.1-rc1" do
-  version "4.6.1-rc1"
-  sha256 "07009bb203a5145acdc5143761f98428eafda89e4f33d431168865defe83a6a6"
+cask "godot-dev@4.8-dev1" do
+  version "4.8-dev1"
+  sha256 "0337f04e3375bb39039b3f4712bb3f682c5d1cced083f6511e18a050b21142d0"
 
-  url "https://github.com/godotengine/godot-builds/releases/download/4.6.1-rc1/Godot_v4.6.1-rc1_macos.universal.zip",
+  url "https://github.com/godotengine/godot-builds/releases/download/4.8-dev1/Godot_v4.8-dev1_macos.universal.zip",
       verified: "github.com/godotengine/godot-builds/"
-  name "Godot Engine (Build 4.6.1-rc1)"
-  desc "Free and open source 2D and 3D game engine (godot-builds release 4.6.1-rc1)"
+  name "Godot Engine (Build 4.8-dev1)"
+  desc "Free and open source 2D and 3D game engine (godot-builds release 4.8-dev1)"
   homepage "https://godotengine.org/"
 
   livecheck do
